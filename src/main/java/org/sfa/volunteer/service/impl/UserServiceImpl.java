@@ -405,10 +405,10 @@ import java.util.stream.Collectors;
                 .language1(user.getLanguage1())
                 .language2(user.getLanguage2())
                 .language3(user.getLanguage3())
-                .secondaryEmail1(detail != null ? detail.getSecondaryEmail1() : null)
-                .secondaryEmail2(detail != null ? detail.getSecondaryEmail2() : null)
-                .secondaryPhone1(detail != null ? detail.getSecondaryPhone1() : null)
-                .secondaryPhone2(detail != null ? detail.getSecondaryPhone2() : null)
+                .primaryEmail(detail != null ? detail.getSecondaryEmail1() : null)
+                .secondaryEmail(detail != null ? detail.getSecondaryEmail2() : null)
+                .primaryPhone(detail != null ? detail.getSecondaryPhone1() : null)
+                .secondaryPhone(detail != null ? detail.getSecondaryPhone2() : null)
                 .build();
     }
 
@@ -450,10 +450,10 @@ import java.util.stream.Collectors;
                     .language1(user.getLanguage1())
                     .language2(user.getLanguage2())
                     .language3(user.getLanguage3())
-                    .secondaryEmail1(detail.getSecondaryEmail1())
-                    .secondaryEmail2(detail.getSecondaryEmail2())
-                    .secondaryPhone1(detail.getSecondaryPhone1())
-                    .secondaryPhone2(detail.getSecondaryPhone2())
+                    .primaryEmail(detail.getSecondaryEmail1())
+                    .secondaryEmail(detail.getSecondaryEmail2())
+                    .primaryPhone(detail.getSecondaryPhone1())
+                    .secondaryPhone(detail.getSecondaryPhone2())
                     .build();
     }
 }

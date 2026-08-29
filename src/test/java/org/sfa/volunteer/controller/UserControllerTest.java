@@ -38,8 +38,8 @@ class UserControllerTest {
                 .userCategory("Common User")
                 .language1("English")
                 .language2("Spanish")
-                .secondaryEmail1("secondary@example.com")
-                .secondaryPhone1("123-456-7890")
+                .primaryEmail("secondary@example.com")
+                .primaryPhone("123-456-7890")
                 .build();
 
         when(userService.getUserPreferences(userId)).thenReturn(mockResponse);
@@ -51,8 +51,8 @@ class UserControllerTest {
                 .andExpect(jsonPath("$.data.language1").value("English"))
                 .andExpect(jsonPath("$.data.language2").value("Spanish"))
                 .andExpect(jsonPath("$.data.userCategory").value("Common User"))
-                .andExpect(jsonPath("$.data.secondaryEmail1").value("secondary@example.com"))
-                .andExpect(jsonPath("$.data.secondaryPhone1").value("123-456-7890"));
+                .andExpect(jsonPath("$.data.primaryEmail").value("secondary@example.com"))
+                .andExpect(jsonPath("$.data.primaryPhone").value("123-456-7890"));
     }
 
     // TEST 2: Non-existent userId returns error response with success=false
@@ -80,8 +80,8 @@ class UserControllerTest {
                 .userCategory(null)
                 .language1(null)
                 .language2(null)
-                .secondaryEmail1(null)
-                .secondaryPhone1(null)
+                .primaryEmail(null)
+                .primaryPhone(null)
                 .build();
 
         when(userService.getUserPreferences(userId)).thenReturn(mockResponse);
@@ -91,6 +91,6 @@ class UserControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.userId").value(userId))
                 .andExpect(jsonPath("$.data.language1").doesNotExist())
-                .andExpect(jsonPath("$.data.secondaryEmail1").doesNotExist());
+                .andExpect(jsonPath("$.data.primaryEmail").doesNotExist());
     }
 }

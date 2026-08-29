@@ -11,8 +11,8 @@ public record UserPreferenceResponse(
         String language1,
         String language2,
         String language3,
-        @Email String secondaryEmail1,
-        @Email String secondaryEmail2,
-        String secondaryPhone1,
-        String secondaryPhone2) {
+        @Email String primaryEmail,
+        @Email String secondaryEmail,
+        String primaryPhone,
+        String secondaryPhone) {
 }

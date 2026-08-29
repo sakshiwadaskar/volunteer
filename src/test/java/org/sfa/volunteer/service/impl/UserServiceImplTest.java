@@ -107,8 +107,8 @@ class UserServiceImplTest {
         assertEquals("English", response.language1());
         assertEquals("Spanish", response.language2());
         assertEquals("Volunteer", response.userCategory());
-        assertEquals("secondary@example.com", response.secondaryEmail1());
-        assertEquals("123-456-7890", response.secondaryPhone1());
+        assertEquals("secondary@example.com", response.primaryEmail());
+        assertEquals("123-456-7890", response.primaryPhone());
 
         // Verify interactions
         verify(userRepository).findById(userId);
@@ -137,7 +137,7 @@ class UserServiceImplTest {
         assertEquals(userId, response.userId());
         assertEquals("English", response.language1());
         assertNull(response.userCategory());
-        assertNull(response.secondaryEmail1());
+        assertNull(response.primaryEmail());
 
         verify(userRepository).findById(userId);
         verify(userAdditionalDetailRepository).findByUserId(userId);
