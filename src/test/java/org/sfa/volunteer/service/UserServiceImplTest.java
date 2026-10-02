@@ -96,46 +96,46 @@ class UserServiceImplTest {
 
     @Test
     void getUserIdByEmailForAuthMatchesExactCaseEmail() {
-        User existing = userWithEmail("sakshiwadaskar43@gmail.com");
-        when(userRepository.findFirstByPrimaryEmailAddressIgnoreCaseOrderByLastUpdateDateDesc("sakshiwadaskar43@gmail.com"))
+        User existing = userWithEmail("jane.doe@example.com");
+        when(userRepository.findFirstByPrimaryEmailAddressIgnoreCaseOrderByLastUpdateDateDesc("jane.doe@example.com"))
                 .thenReturn(Optional.of(existing));
 
-        String userId = userService.getUserIdByEmailForAuth("sakshiwadaskar43@gmail.com");
+        String userId = userService.getUserIdByEmailForAuth("jane.doe@example.com");
 
         assertThat(userId).isEqualTo("user-1");
     }
 
     @Test
     void getUserIdByEmailForAuthIsCaseInsensitive() {
-        User existing = userWithEmail("sakshiwadaskar43@gmail.com");
-        when(userRepository.findFirstByPrimaryEmailAddressIgnoreCaseOrderByLastUpdateDateDesc("SakshiWadaskar43@Gmail.com"))
+        User existing = userWithEmail("jane.doe@example.com");
+        when(userRepository.findFirstByPrimaryEmailAddressIgnoreCaseOrderByLastUpdateDateDesc("Jane.Doe@Example.com"))
                 .thenReturn(Optional.of(existing));
 
-        String userId = userService.getUserIdByEmailForAuth("SakshiWadaskar43@Gmail.com");
+        String userId = userService.getUserIdByEmailForAuth("Jane.Doe@Example.com");
 
         assertThat(userId).isEqualTo("user-1");
     }
 
     @Test
     void getUserIdByEmailForAuthTrimsWhitespace() {
-        User existing = userWithEmail("sakshiwadaskar43@gmail.com");
-        when(userRepository.findFirstByPrimaryEmailAddressIgnoreCaseOrderByLastUpdateDateDesc("sakshiwadaskar43@gmail.com"))
+        User existing = userWithEmail("jane.doe@example.com");
+        when(userRepository.findFirstByPrimaryEmailAddressIgnoreCaseOrderByLastUpdateDateDesc("jane.doe@example.com"))
                 .thenReturn(Optional.of(existing));
 
-        String userId = userService.getUserIdByEmailForAuth(" sakshiwadaskar43@gmail.com ");
+        String userId = userService.getUserIdByEmailForAuth(" jane.doe@example.com ");
 
         assertThat(userId).isEqualTo("user-1");
     }
 
     @Test
     void getUserIdByEmailForAuthFallsBackToOrderByIdWhenNoRecentMatch() {
-        User existing = userWithEmail("sakshiwadaskar43@gmail.com");
-        when(userRepository.findFirstByPrimaryEmailAddressIgnoreCaseOrderByLastUpdateDateDesc("sakshiwadaskar43@gmail.com"))
+        User existing = userWithEmail("jane.doe@example.com");
+        when(userRepository.findFirstByPrimaryEmailAddressIgnoreCaseOrderByLastUpdateDateDesc("jane.doe@example.com"))
                 .thenReturn(Optional.empty());
-        when(userRepository.findFirstByPrimaryEmailAddressIgnoreCaseOrderByIdDesc("sakshiwadaskar43@gmail.com"))
+        when(userRepository.findFirstByPrimaryEmailAddressIgnoreCaseOrderByIdDesc("jane.doe@example.com"))
                 .thenReturn(Optional.of(existing));
 
-        String userId = userService.getUserIdByEmailForAuth("sakshiwadaskar43@gmail.com");
+        String userId = userService.getUserIdByEmailForAuth("jane.doe@example.com");
 
         assertThat(userId).isEqualTo("user-1");
     }
@@ -154,8 +154,8 @@ class UserServiceImplTest {
     private static User userWithEmail(String email) {
         return User.builder()
                 .id("user-1")
-                .firstName("Sakshi")
-                .lastName("Wadaskar")
+                .firstName("Jane")
+                .lastName("Doe")
                 .primaryEmailAddress(email)
                 .build();
     }
