@@ -347,12 +347,13 @@ import java.util.stream.Collectors;
         if (email == null || email.isBlank()) {
             throw new UserNotFoundException("email is blank");
         }
-        var userOpt = userRepository.findFirstByPrimaryEmailAddressOrderByLastUpdateDateDesc(email);
+        String normalized = email.trim();
+        var userOpt = userRepository.findFirstByPrimaryEmailAddressIgnoreCaseOrderByLastUpdateDateDesc(normalized);
         if (userOpt.isEmpty()) {
-            userOpt = userRepository.findFirstByPrimaryEmailAddressOrderByIdDesc(email);
+            userOpt = userRepository.findFirstByPrimaryEmailAddressIgnoreCaseOrderByIdDesc(normalized);
         }
 
-        User user = userOpt.orElseThrow(() -> new UserNotFoundException(email));
+        User user = userOpt.orElseThrow(() -> new UserNotFoundException(normalized));
         return user.getId();
     }
 

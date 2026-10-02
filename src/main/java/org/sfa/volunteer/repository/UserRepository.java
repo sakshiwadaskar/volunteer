@@ -22,6 +22,10 @@ public interface UserRepository extends JpaRepository<User, String> {
     // fallback if lastUpdateDate is null/old data
     Optional<User> findFirstByPrimaryEmailAddressOrderByIdDesc(String email);
 
+    Optional<User> findFirstByPrimaryEmailAddressIgnoreCaseOrderByLastUpdateDateDesc(String email);
+    // fallback if lastUpdateDate is null/old data
+    Optional<User> findFirstByPrimaryEmailAddressIgnoreCaseOrderByIdDesc(String email);
+
     @Query("""
             select u from User u
             where
