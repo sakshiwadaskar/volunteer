@@ -12,7 +12,6 @@ import org.sfa.volunteer.model.Country;
 import org.sfa.volunteer.model.State;
 import org.sfa.volunteer.model.User;
 import org.sfa.volunteer.model.UserAdditionalDetail;
-import org.sfa.volunteer.model.UserCategory;
 import org.sfa.volunteer.model.UserSignOffReason;
 import org.sfa.volunteer.model.UserStatus;
 import org.sfa.volunteer.repository.CountryRepository;
@@ -85,9 +84,6 @@ import java.util.stream.Collectors;
         UserStatus userStatus = userStatusRepository.findById(DEFAULT_USER_STATUS_ID)
                 .orElseThrow(() -> new UserCategoryNotFoundException(DEFAULT_USER_STATUS_ID));
 
-        UserCategory userCategory = userCategoryRepository.findById(DEFAULT_USER_CATEGORY_ID)
-                .orElseThrow(() -> new UserCategoryNotFoundException(DEFAULT_USER_CATEGORY_ID));
-
         Country country = countryRepository.findByCountryName(request.country())
                 .orElseThrow(() -> new CountryNotFoundException(request.country()));
 
@@ -109,7 +105,6 @@ import java.util.stream.Collectors;
                 .primaryPhoneNumber(request.phoneNumber())
                 .timeZone(timeZone)
                 .lastUpdateDate(ZonedDateTime.now(ZoneId.of("UTC")))
-                .userCategory(userCategory)
                 .userStatus(userStatus)
                 .country(country)
                 .build();
@@ -190,12 +185,9 @@ import java.util.stream.Collectors;
     public boolean isAdminUser(String userId) {
         if (userId == null || userId.isBlank()) return false;
 
-        User user = userRepository.findById(userId).orElse(null);
-        if (user == null) return false;
-
-        String category = (user.getUserCategory() == null) ? null : user.getUserCategory().getUserCategory();
-
-        if (category != null && category.toLowerCase().contains("admin")) return true;
+        // userCategory is no longer mapped on User (see issue #165 follow-up on
+        // the user_category_id schema removal), so admin status can't be
+        // determined here yet. Fail closed (deny admin) rather than throw.
         return false;
     }
 
@@ -283,7 +275,8 @@ import java.util.stream.Collectors;
                 .stateName(user.getState() != null ? user.getState().getStateName() : null)
                 .countryName(user.getCountry() != null ? user.getCountry().getCountryName() : null)
                 .userStatus(user.getUserStatus() != null ? user.getUserStatus().getUserStatus() : null)
-                .userCategory(user.getUserCategory() != null ? user.getUserCategory().getUserCategory() : null)
+                // userCategory no longer mapped on User; see issue #165 follow-up
+                .userCategory(null)
                 .gender(user.getGender())
                 .lastLocation(user.getLastLocation())
                 .language1(user.getLanguage1())
@@ -323,17 +316,16 @@ import java.util.stream.Collectors;
     // Profile Pic Upload
     // S3 URI <-> DB //
     @Override
+    @Transactional
     public void setProfilePicturePath(String userId, String s3Uri) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new UserNotFoundException(userId));
-        user.setProfilePicturePath(s3Uri);  // store S3 URI here
-        user.setLastUpdateDate(ZonedDateTime.now(ZoneId.of("UTC")));
-        userRepository.save(user);
+        int updated = userRepository.updateProfilePicturePath(userId, s3Uri, ZonedDateTime.now(ZoneId.of("UTC")));
+        if (updated == 0) {
+            throw new UserNotFoundException(userId);
+        }
     }
     @Override
     public Optional<String> getProfilePicturePath(String userId) {
-        return userRepository.findById(userId)
-                .map(User::getProfilePicturePath)
+        return userRepository.findProfilePicturePathById(userId)
                 .filter(Objects::nonNull)
                 .filter(s -> !s.isBlank());
     }
@@ -348,13 +340,14 @@ import java.util.stream.Collectors;
             throw new UserNotFoundException("email is blank");
         }
         String normalized = email.trim();
-        var userOpt = userRepository.findFirstByPrimaryEmailAddressIgnoreCaseOrderByLastUpdateDateDesc(normalized);
-        if (userOpt.isEmpty()) {
-            userOpt = userRepository.findFirstByPrimaryEmailAddressIgnoreCaseOrderByIdDesc(normalized);
+        List<String> userIds = userRepository.findUserIdsByEmailIgnoreCaseOrderByLastUpdateDateDesc(normalized);
+        if (userIds.isEmpty()) {
+            userIds = userRepository.findUserIdsByEmailIgnoreCaseOrderByIdDesc(normalized);
         }
-
-        User user = userOpt.orElseThrow(() -> new UserNotFoundException(normalized));
-        return user.getId();
+        if (userIds.isEmpty()) {
+            throw new UserNotFoundException(normalized);
+        }
+        return userIds.get(0);
     }
 
     @Transactional

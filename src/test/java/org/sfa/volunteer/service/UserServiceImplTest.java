@@ -17,11 +17,14 @@ import org.sfa.volunteer.repository.UserSignOffReasonRepository;
 import org.sfa.volunteer.repository.UserStatusRepository;
 import org.sfa.volunteer.service.impl.UserServiceImpl;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -96,9 +99,8 @@ class UserServiceImplTest {
 
     @Test
     void getUserIdByEmailForAuthMatchesExactCaseEmail() {
-        User existing = userWithEmail("jane.doe@example.com");
-        when(userRepository.findFirstByPrimaryEmailAddressIgnoreCaseOrderByLastUpdateDateDesc("jane.doe@example.com"))
-                .thenReturn(Optional.of(existing));
+        when(userRepository.findUserIdsByEmailIgnoreCaseOrderByLastUpdateDateDesc("jane.doe@example.com"))
+                .thenReturn(List.of("user-1"));
 
         String userId = userService.getUserIdByEmailForAuth("jane.doe@example.com");
 
@@ -107,9 +109,8 @@ class UserServiceImplTest {
 
     @Test
     void getUserIdByEmailForAuthIsCaseInsensitive() {
-        User existing = userWithEmail("jane.doe@example.com");
-        when(userRepository.findFirstByPrimaryEmailAddressIgnoreCaseOrderByLastUpdateDateDesc("Jane.Doe@Example.com"))
-                .thenReturn(Optional.of(existing));
+        when(userRepository.findUserIdsByEmailIgnoreCaseOrderByLastUpdateDateDesc("Jane.Doe@Example.com"))
+                .thenReturn(List.of("user-1"));
 
         String userId = userService.getUserIdByEmailForAuth("Jane.Doe@Example.com");
 
@@ -118,9 +119,8 @@ class UserServiceImplTest {
 
     @Test
     void getUserIdByEmailForAuthTrimsWhitespace() {
-        User existing = userWithEmail("jane.doe@example.com");
-        when(userRepository.findFirstByPrimaryEmailAddressIgnoreCaseOrderByLastUpdateDateDesc("jane.doe@example.com"))
-                .thenReturn(Optional.of(existing));
+        when(userRepository.findUserIdsByEmailIgnoreCaseOrderByLastUpdateDateDesc("jane.doe@example.com"))
+                .thenReturn(List.of("user-1"));
 
         String userId = userService.getUserIdByEmailForAuth(" jane.doe@example.com ");
 
@@ -129,11 +129,10 @@ class UserServiceImplTest {
 
     @Test
     void getUserIdByEmailForAuthFallsBackToOrderByIdWhenNoRecentMatch() {
-        User existing = userWithEmail("jane.doe@example.com");
-        when(userRepository.findFirstByPrimaryEmailAddressIgnoreCaseOrderByLastUpdateDateDesc("jane.doe@example.com"))
-                .thenReturn(Optional.empty());
-        when(userRepository.findFirstByPrimaryEmailAddressIgnoreCaseOrderByIdDesc("jane.doe@example.com"))
-                .thenReturn(Optional.of(existing));
+        when(userRepository.findUserIdsByEmailIgnoreCaseOrderByLastUpdateDateDesc("jane.doe@example.com"))
+                .thenReturn(List.of());
+        when(userRepository.findUserIdsByEmailIgnoreCaseOrderByIdDesc("jane.doe@example.com"))
+                .thenReturn(List.of("user-1"));
 
         String userId = userService.getUserIdByEmailForAuth("jane.doe@example.com");
 
@@ -142,22 +141,51 @@ class UserServiceImplTest {
 
     @Test
     void getUserIdByEmailForAuthThrowsWhenNoUserMatches() {
-        when(userRepository.findFirstByPrimaryEmailAddressIgnoreCaseOrderByLastUpdateDateDesc("unknown@gmail.com"))
-                .thenReturn(Optional.empty());
-        when(userRepository.findFirstByPrimaryEmailAddressIgnoreCaseOrderByIdDesc("unknown@gmail.com"))
-                .thenReturn(Optional.empty());
+        when(userRepository.findUserIdsByEmailIgnoreCaseOrderByLastUpdateDateDesc("unknown@gmail.com"))
+                .thenReturn(List.of());
+        when(userRepository.findUserIdsByEmailIgnoreCaseOrderByIdDesc("unknown@gmail.com"))
+                .thenReturn(List.of());
 
         assertThatThrownBy(() -> userService.getUserIdByEmailForAuth("unknown@gmail.com"))
                 .isInstanceOf(UserNotFoundException.class);
     }
 
-    private static User userWithEmail(String email) {
-        return User.builder()
-                .id("user-1")
-                .firstName("Jane")
-                .lastName("Doe")
-                .primaryEmailAddress(email)
-                .build();
+    @Test
+    void setProfilePicturePathUpdatesOnlyTheProfileColumns() {
+        when(userRepository.updateProfilePicturePath(eq("user-1"), eq("s3://bucket/users/user-1/profile"), any()))
+                .thenReturn(1);
+
+        userService.setProfilePicturePath("user-1", "s3://bucket/users/user-1/profile");
+
+        // no exception means the narrow update path succeeded without touching
+        // the rest of the entity's (currently schema-drifted) columns
+    }
+
+    @Test
+    void setProfilePicturePathThrowsWhenUserDoesNotExist() {
+        when(userRepository.updateProfilePicturePath(eq("missing-user"), anyString(), any()))
+                .thenReturn(0);
+
+        assertThatThrownBy(() -> userService.setProfilePicturePath("missing-user", "s3://bucket/path"))
+                .isInstanceOf(UserNotFoundException.class);
+    }
+
+    @Test
+    void getProfilePicturePathReturnsValueWhenPresent() {
+        when(userRepository.findProfilePicturePathById("user-1"))
+                .thenReturn(Optional.of("s3://bucket/users/user-1/profile"));
+
+        assertThat(userService.getProfilePicturePath("user-1"))
+                .contains("s3://bucket/users/user-1/profile");
+    }
+
+    @Test
+    void getProfilePicturePathReturnsEmptyWhenBlankOrMissing() {
+        when(userRepository.findProfilePicturePathById("user-1")).thenReturn(Optional.of(" "));
+        when(userRepository.findProfilePicturePathById("user-2")).thenReturn(Optional.empty());
+
+        assertThat(userService.getProfilePicturePath("user-1")).isEmpty();
+        assertThat(userService.getProfilePicturePath("user-2")).isEmpty();
     }
 
     private static User userWithProfilePath(String profilePicturePath) {

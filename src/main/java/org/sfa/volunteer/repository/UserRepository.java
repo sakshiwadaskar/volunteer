@@ -4,10 +4,12 @@ import org.sfa.volunteer.model.User;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -22,9 +24,26 @@ public interface UserRepository extends JpaRepository<User, String> {
     // fallback if lastUpdateDate is null/old data
     Optional<User> findFirstByPrimaryEmailAddressOrderByIdDesc(String email);
 
-    Optional<User> findFirstByPrimaryEmailAddressIgnoreCaseOrderByLastUpdateDateDesc(String email);
+    // Id-only projections: avoid hydrating the full User entity (and its many
+    // columns) just to resolve an email to a user id.
+    @Query("select u.id from User u where lower(u.primaryEmailAddress) = lower(:email) order by u.lastUpdateDate desc")
+    List<String> findUserIdsByEmailIgnoreCaseOrderByLastUpdateDateDesc(@Param("email") String email);
+
     // fallback if lastUpdateDate is null/old data
-    Optional<User> findFirstByPrimaryEmailAddressIgnoreCaseOrderByIdDesc(String email);
+    @Query("select u.id from User u where lower(u.primaryEmailAddress) = lower(:email) order by u.id desc")
+    List<String> findUserIdsByEmailIgnoreCaseOrderByIdDesc(@Param("email") String email);
+
+    // Narrow read/write for the profile-image path: avoid hydrating or
+    // saving the full User entity, which currently includes columns
+    // (language_1/2/3, user_category_id) that no longer match the real
+    // schema. See issue #165 follow-up on the broader schema drift.
+    @Query("select u.profilePicturePath from User u where u.id = :userId")
+    Optional<String> findProfilePicturePathById(@Param("userId") String userId);
+
+    @Modifying
+    @Query("update User u set u.profilePicturePath = :s3Uri, u.lastUpdateDate = :now where u.id = :userId")
+    int updateProfilePicturePath(@Param("userId") String userId, @Param("s3Uri") String s3Uri,
+            @Param("now") ZonedDateTime now);
 
     @Query("""
             select u from User u
