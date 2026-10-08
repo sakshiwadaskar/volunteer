@@ -17,7 +17,6 @@ import org.sfa.volunteer.repository.UserSignOffReasonRepository;
 import org.sfa.volunteer.repository.UserStatusRepository;
 import org.sfa.volunteer.service.impl.UserServiceImpl;
 
-import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -98,56 +97,53 @@ class UserServiceImplTest {
     }
 
     @Test
-    void getUserIdByEmailForAuthMatchesExactCaseEmail() {
-        when(userRepository.findUserIdsByEmailIgnoreCaseOrderByLastUpdateDateDesc("jane.doe@example.com"))
-                .thenReturn(List.of("user-1"));
+    void isEmailOwnedByUserMatchesExactCaseEmail() {
+        when(userRepository.existsByIdAndPrimaryEmailAddressIgnoreCase("user-1", "jane.doe@example.com"))
+                .thenReturn(true);
 
-        String userId = userService.getUserIdByEmailForAuth("jane.doe@example.com");
-
-        assertThat(userId).isEqualTo("user-1");
+        assertThat(userService.isEmailOwnedByUser("user-1", "jane.doe@example.com")).isTrue();
     }
 
     @Test
-    void getUserIdByEmailForAuthIsCaseInsensitive() {
-        when(userRepository.findUserIdsByEmailIgnoreCaseOrderByLastUpdateDateDesc("Jane.Doe@Example.com"))
-                .thenReturn(List.of("user-1"));
+    void isEmailOwnedByUserIsCaseInsensitive() {
+        when(userRepository.existsByIdAndPrimaryEmailAddressIgnoreCase("user-1", "Jane.Doe@Example.com"))
+                .thenReturn(true);
 
-        String userId = userService.getUserIdByEmailForAuth("Jane.Doe@Example.com");
-
-        assertThat(userId).isEqualTo("user-1");
+        assertThat(userService.isEmailOwnedByUser("user-1", "Jane.Doe@Example.com")).isTrue();
     }
 
     @Test
-    void getUserIdByEmailForAuthTrimsWhitespace() {
-        when(userRepository.findUserIdsByEmailIgnoreCaseOrderByLastUpdateDateDesc("jane.doe@example.com"))
-                .thenReturn(List.of("user-1"));
+    void isEmailOwnedByUserTrimsWhitespace() {
+        when(userRepository.existsByIdAndPrimaryEmailAddressIgnoreCase("user-1", "jane.doe@example.com"))
+                .thenReturn(true);
 
-        String userId = userService.getUserIdByEmailForAuth(" jane.doe@example.com ");
-
-        assertThat(userId).isEqualTo("user-1");
+        assertThat(userService.isEmailOwnedByUser("user-1", " jane.doe@example.com ")).isTrue();
     }
 
     @Test
-    void getUserIdByEmailForAuthFallsBackToOrderByIdWhenNoRecentMatch() {
-        when(userRepository.findUserIdsByEmailIgnoreCaseOrderByLastUpdateDateDesc("jane.doe@example.com"))
-                .thenReturn(List.of());
-        when(userRepository.findUserIdsByEmailIgnoreCaseOrderByIdDesc("jane.doe@example.com"))
-                .thenReturn(List.of("user-1"));
+    void isEmailOwnedByUserReturnsFalseForEmailBelongingToADifferentDuplicateRow() {
+        // e.g. two rows share an email; the caller claims a userId that isn't
+        // the one owning this email -- should be denied, not resolved to a
+        // different user's id.
+        when(userRepository.existsByIdAndPrimaryEmailAddressIgnoreCase("other-user", "jane.doe@example.com"))
+                .thenReturn(false);
 
-        String userId = userService.getUserIdByEmailForAuth("jane.doe@example.com");
-
-        assertThat(userId).isEqualTo("user-1");
+        assertThat(userService.isEmailOwnedByUser("other-user", "jane.doe@example.com")).isFalse();
     }
 
     @Test
-    void getUserIdByEmailForAuthThrowsWhenNoUserMatches() {
-        when(userRepository.findUserIdsByEmailIgnoreCaseOrderByLastUpdateDateDesc("unknown@gmail.com"))
-                .thenReturn(List.of());
-        when(userRepository.findUserIdsByEmailIgnoreCaseOrderByIdDesc("unknown@gmail.com"))
-                .thenReturn(List.of());
+    void isEmailOwnedByUserReturnsFalseWhenNoUserMatches() {
+        when(userRepository.existsByIdAndPrimaryEmailAddressIgnoreCase("user-1", "unknown@gmail.com"))
+                .thenReturn(false);
 
-        assertThatThrownBy(() -> userService.getUserIdByEmailForAuth("unknown@gmail.com"))
-                .isInstanceOf(UserNotFoundException.class);
+        assertThat(userService.isEmailOwnedByUser("user-1", "unknown@gmail.com")).isFalse();
+    }
+
+    @Test
+    void isEmailOwnedByUserReturnsFalseForBlankInput() {
+        assertThat(userService.isEmailOwnedByUser(null, "jane.doe@example.com")).isFalse();
+        assertThat(userService.isEmailOwnedByUser("user-1", null)).isFalse();
+        assertThat(userService.isEmailOwnedByUser(" ", "jane.doe@example.com")).isFalse();
     }
 
     @Test

@@ -24,14 +24,12 @@ public interface UserRepository extends JpaRepository<User, String> {
     // fallback if lastUpdateDate is null/old data
     Optional<User> findFirstByPrimaryEmailAddressOrderByIdDesc(String email);
 
-    // Id-only projections: avoid hydrating the full User entity (and its many
-    // columns) just to resolve an email to a user id.
-    @Query("select u.id from User u where lower(u.primaryEmailAddress) = lower(:email) order by u.lastUpdateDate desc")
-    List<String> findUserIdsByEmailIgnoreCaseOrderByLastUpdateDateDesc(@Param("email") String email);
-
-    // fallback if lastUpdateDate is null/old data
-    @Query("select u.id from User u where lower(u.primaryEmailAddress) = lower(:email) order by u.id desc")
-    List<String> findUserIdsByEmailIgnoreCaseOrderByIdDesc(@Param("email") String email);
+    // Auth check for the profile-image path: confirms a *specific* user id
+    // owns a given email, rather than resolving "the" user for an email (which
+    // is ambiguous when two rows share an email -- see issue #165 follow-up on
+    // duplicate-email rows). The caller already supplies the user id it
+    // believes is correct; this just verifies that claim against this one row.
+    boolean existsByIdAndPrimaryEmailAddressIgnoreCase(String id, String primaryEmailAddress);
 
     // Narrow read/write for the profile-image path: avoid hydrating or
     // saving the full User entity, which currently includes columns

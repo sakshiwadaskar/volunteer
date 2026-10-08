@@ -91,9 +91,11 @@ class ProfileImageSchemaIntegrationTest {
 
     @Test
     void endToEndProfileImageFlowAgainstRealSchema() {
-        // case-insensitive, trimmed auth lookup (issue #165 fix)
-        String userId = userService.getUserIdByEmailForAuth(" jane.doe@example.com ");
-        assertThat(userId).isEqualTo("SID-TEST-1");
+        // case-insensitive, trimmed auth check (issue #165 fix): does this
+        // specific userId own this email?
+        String userId = "SID-TEST-1";
+        assertThat(userService.isEmailOwnedByUser(userId, " jane.doe@example.com ")).isTrue();
+        assertThat(userService.isEmailOwnedByUser("some-other-user", " jane.doe@example.com ")).isFalse();
 
         // narrow write: must not attempt to write language_1/2/3 (bigint) or any
         // other column it doesn't need

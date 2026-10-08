@@ -335,19 +335,11 @@ import java.util.stream.Collectors;
         return userRepository.existsById(userId);
     }
     @Override
-    public String getUserIdByEmailForAuth(String email) {
-        if (email == null || email.isBlank()) {
-            throw new UserNotFoundException("email is blank");
+    public boolean isEmailOwnedByUser(String userId, String email) {
+        if (userId == null || userId.isBlank() || email == null || email.isBlank()) {
+            return false;
         }
-        String normalized = email.trim();
-        List<String> userIds = userRepository.findUserIdsByEmailIgnoreCaseOrderByLastUpdateDateDesc(normalized);
-        if (userIds.isEmpty()) {
-            userIds = userRepository.findUserIdsByEmailIgnoreCaseOrderByIdDesc(normalized);
-        }
-        if (userIds.isEmpty()) {
-            throw new UserNotFoundException(normalized);
-        }
-        return userIds.get(0);
+        return userRepository.existsByIdAndPrimaryEmailAddressIgnoreCase(userId, email.trim());
     }
 
     @Transactional
