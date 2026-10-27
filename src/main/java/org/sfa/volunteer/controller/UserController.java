@@ -251,6 +251,8 @@ public class UserController {
     public SaayamResponse<UserPreferenceResponse> getUserPreferences(@PathVariable String userId) throws Exception {
         UserPreferenceResponse response = userService.getUserPreferences(userId);
         return responseBuilder.buildSuccessResponse(SaayamStatusCode.SUCCESS, new Object[]{userId}, response);
+    }
+
     @GetMapping("/search")
     public SaayamResponse<PaginationResponse<UserProfileResponse>> searchUsers(
             @RequestParam("q") String query,

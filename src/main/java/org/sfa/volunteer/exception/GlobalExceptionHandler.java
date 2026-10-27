@@ -143,6 +143,24 @@ public class GlobalExceptionHandler {
                                 errorMessage);
         }
 
+        @ExceptionHandler(LanguageNotFoundException.class)
+        @ResponseBody
+        public <T> SaayamResponse<T> handleLanguageNotFoundException(
+                        LanguageNotFoundException exception,
+                        WebRequest request) {
+
+                String errorMessage = messageSourceUtil.getMessage(
+                                SaayamStatusCode.LANGUAGE_NOT_FOUND.getCode(),
+                                new Object[] { exception.getLanguageId() });
+
+                log.error("LanguageNotFoundException: {}", errorMessage);
+
+                return responseBuilder.buildErrorResponse(
+                                HttpStatus.NOT_FOUND.value(),
+                                SaayamStatusCode.LANGUAGE_NOT_FOUND,
+                                errorMessage);
+        }
+
 	@ExceptionHandler(MethodArgumentNotValidException.class)
         @ResponseBody
         public <T> SaayamResponse<T> handleValidationException(MethodArgumentNotValidException exception, WebRequest request) {

@@ -1,27 +1,11 @@
 package org.sfa.volunteer.controller;
 
 import org.junit.jupiter.api.Test;
-import org.sfa.volunteer.dto.response.UserPreferenceResponse;
-import org.sfa.volunteer.exception.UserNotFoundException;
-import org.sfa.volunteer.service.UserService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.http.MediaType;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.web.servlet.MockMvc;
-
-import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
-
-@SpringBootTest
-@AutoConfigureMockMvc
-@ActiveProfiles("test")
 import org.sfa.volunteer.dto.common.SaayamResponse;
 import org.sfa.volunteer.dto.common.SaayamStatusCode;
+import org.sfa.volunteer.dto.response.UserPreferenceResponse;
 import org.sfa.volunteer.dto.response.UserSkillsResponse;
+import org.sfa.volunteer.exception.UserNotFoundException;
 import org.sfa.volunteer.model.SkillLevel;
 import org.sfa.volunteer.service.ProfileImageStorageService;
 import org.sfa.volunteer.service.UserService;
@@ -33,10 +17,9 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+
 import java.util.List;
 import java.util.Map;
-
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -44,8 +27,9 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(UserController.class)
 class UserControllerTest {
@@ -55,6 +39,15 @@ class UserControllerTest {
 
     @MockBean
     private UserService userService;
+
+    @MockBean
+    private ResponseBuilder responseBuilder;
+
+    @MockBean
+    private ProfileImageStorageService profileImageStorageService;
+
+    @MockBean
+    private MessageSourceUtil messageSourceUtil;
 
     // TEST 1: Valid userId returns 200 with preferences data
     @Test
@@ -72,6 +65,8 @@ class UserControllerTest {
                 .build();
 
         when(userService.getUserPreferences(userId)).thenReturn(mockResponse);
+        when(responseBuilder.buildSuccessResponse(any(), any(), any()))
+                .thenReturn(SaayamResponse.success(SaayamStatusCode.SUCCESS, "Success", mockResponse));
 
         mockMvc.perform(get("/0.0.1/users/{userId}/preferences", userId)
                         .contentType(MediaType.APPLICATION_JSON))
@@ -91,6 +86,8 @@ class UserControllerTest {
 
         when(userService.getUserPreferences(userId))
                 .thenThrow(new UserNotFoundException(userId));
+        when(responseBuilder.buildErrorResponse(eq(404), eq(SaayamStatusCode.USER_NOT_FOUND), any()))
+                .thenReturn(SaayamResponse.error(404, SaayamStatusCode.USER_NOT_FOUND, "User not found"));
 
         mockMvc.perform(get("/0.0.1/users/{userId}/preferences", userId)
                         .contentType(MediaType.APPLICATION_JSON))
@@ -114,6 +111,8 @@ class UserControllerTest {
                 .build();
 
         when(userService.getUserPreferences(userId)).thenReturn(mockResponse);
+        when(responseBuilder.buildSuccessResponse(any(), any(), any()))
+                .thenReturn(SaayamResponse.success(SaayamStatusCode.SUCCESS, "Success", mockResponse));
 
         mockMvc.perform(get("/0.0.1/users/{userId}/preferences", userId)
                         .contentType(MediaType.APPLICATION_JSON))
@@ -122,15 +121,6 @@ class UserControllerTest {
                 .andExpect(jsonPath("$.data.language1").doesNotExist())
                 .andExpect(jsonPath("$.data.primaryEmail").doesNotExist());
     }
-}
-    @MockBean
-    private ResponseBuilder responseBuilder;
-
-    @MockBean
-    private ProfileImageStorageService profileImageStorageService;
-
-    @MockBean
-    private MessageSourceUtil messageSourceUtil;
 
     @Test
     void shouldReturnUserSkills() throws Exception {

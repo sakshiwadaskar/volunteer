@@ -1,105 +1,110 @@
 package org.sfa.volunteer.handler;
 
-import java.util.Locale;
 import java.util.Optional;
 
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyRequestEvent;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyResponseEvent;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import lombok.extern.slf4j.Slf4j;
 import org.sfa.volunteer.VolunteerApplication;
 import org.sfa.volunteer.dto.common.SaayamResponse;
 import org.sfa.volunteer.dto.common.SaayamStatusCode;
 import org.sfa.volunteer.dto.response.UserPreferenceResponse;
+import org.sfa.volunteer.exception.UserNotFoundException;
 import org.sfa.volunteer.service.UserService;
+import org.sfa.volunteer.util.Cors;
 import org.sfa.volunteer.util.MessageSourceUtil;
 import org.sfa.volunteer.util.ResponseBuilder;
 import org.springframework.boot.SpringApplication;
 import org.springframework.context.ApplicationContext;
 
+/**
+ * GET /{userId}/preferences
+ * Returns the user's language and secondary-contact preferences.
+ */
+@Slf4j
 public class GetUserPreferencesHandler implements RequestHandler<APIGatewayProxyRequestEvent, APIGatewayProxyResponseEvent> {
-    private static final UserService userService;
-    private static final ObjectMapper objectMapper = new ObjectMapper()
+
+    private static final String ALLOWED_METHODS = "GET,OPTIONS";
+
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
             .registerModule(new JavaTimeModule())
             .enable(SerializationFeature.INDENT_OUTPUT);
-    private static final ResponseBuilder responseBuilder;
-    private static final MessageSourceUtil messageSourceUtil;
 
-    static {
-        ApplicationContext context = SpringApplication.run(VolunteerApplication.class);
-        userService = context.getBean(UserService.class);
-        responseBuilder = context.getBean(ResponseBuilder.class);
-        messageSourceUtil = context.getBean(MessageSourceUtil.class);
+    // Started once per Lambda container, on first use
+    private static volatile ApplicationContext springContext;
+
+    private final UserService userService;
+    private final ResponseBuilder responseBuilder;
+    private final MessageSourceUtil messageSourceUtil;
+
+    public GetUserPreferencesHandler() {
+        this(bean(UserService.class), bean(ResponseBuilder.class), bean(MessageSourceUtil.class));
+    }
+
+    GetUserPreferencesHandler(UserService userService, ResponseBuilder responseBuilder,
+                               MessageSourceUtil messageSourceUtil) {
+        this.userService = userService;
+        this.responseBuilder = responseBuilder;
+        this.messageSourceUtil = messageSourceUtil;
     }
 
     @Override
     public APIGatewayProxyResponseEvent handleRequest(APIGatewayProxyRequestEvent requestEvent, Context context) {
-        APIGatewayProxyResponseEvent response = new APIGatewayProxyResponseEvent();
+        APIGatewayProxyResponseEvent response = new APIGatewayProxyResponseEvent()
+                .withHeaders(Cors.headers(ALLOWED_METHODS));
+
+        if ("OPTIONS".equalsIgnoreCase(requestEvent.getHttpMethod())) {
+            return response.withStatusCode(204);
+        }
 
         try {
-            String lang = Optional.ofNullable(requestEvent.getHeaders())
-                    .map(headers -> headers.getOrDefault("Accept-Language", "en"))
-                    .orElse("en");
-            Locale locale = Locale.forLanguageTag(lang);
-
             String userId = Optional.ofNullable(requestEvent.getPathParameters())
                     .map(params -> params.get("userId"))
                     .orElseThrow(() -> new IllegalArgumentException("userId path parameter is missing"));
 
-            UserPreferenceResponse userPreferenceResponse = userService.getUserPreferences(userId);
-
-            SaayamResponse<UserPreferenceResponse> successResponse = responseBuilder.buildSuccessResponse(
-                    SaayamStatusCode.SUCCESS,
-                    new Object[]{userId},
-                    userPreferenceResponse
-            );
-
-            String responseBody = objectMapper.writeValueAsString(successResponse);
-            response.setBody(responseBody);
-            response.setStatusCode(200);
-
+            UserPreferenceResponse preferences = userService.getUserPreferences(userId);
+            SaayamResponse<UserPreferenceResponse> success = responseBuilder.buildSuccessResponse(
+                    SaayamStatusCode.SUCCESS, new Object[]{ userId }, preferences);
+            return response.withStatusCode(200).withBody(OBJECT_MAPPER.writeValueAsString(success));
         } catch (IllegalArgumentException e) {
-            context.getLogger().log("Validation error: " + e.getMessage());
-
-            SaayamResponse<Void> errorResponse = responseBuilder.buildErrorResponse(
-                    400,
-                    SaayamStatusCode.BAD_REQUEST,
-                    e.getMessage()
-            );
-
-            try {
-                response.setBody(objectMapper.writeValueAsString(errorResponse));
-            } catch (Exception ex) {
-                response.setBody("{\"message\":\"Invalid request\"}");
-            }
-
-            response.setStatusCode(400);
-
+            return error(response, 400, SaayamStatusCode.BAD_REQUEST, e.getMessage());
+        } catch (UserNotFoundException e) {
+            String msg = messageSourceUtil.getMessage(
+                    SaayamStatusCode.USER_NOT_FOUND.getCode(), new Object[]{ e.getUserId() });
+            return error(response, 404, SaayamStatusCode.USER_NOT_FOUND, msg);
         } catch (Exception e) {
-            context.getLogger().log("Error processing get-user-preferences request: " + e.getMessage());
-            e.printStackTrace();
-
-            String errorMessage = messageSourceUtil.getMessage(SaayamStatusCode.INTERNAL_SERVER_ERROR.getCode(), null);
-
-            SaayamResponse<Void> errorResponse = responseBuilder.buildErrorResponse(
-                    500,
-                    SaayamStatusCode.INTERNAL_SERVER_ERROR,
-                    errorMessage
-            );
-
-            try {
-                String responseBody = objectMapper.writeValueAsString(errorResponse);
-                response.setBody(responseBody);
-            } catch (Exception jsonException) {
-                response.setBody("{\"message\":\"Failed to serialize error response\"}");
-            }
-
-            response.setStatusCode(500);
+            log.error("Get user preferences request failed", e);
+            String msg = messageSourceUtil.getMessage(SaayamStatusCode.INTERNAL_SERVER_ERROR.getCode(), null);
+            return error(response, 500, SaayamStatusCode.INTERNAL_SERVER_ERROR, msg);
         }
+    }
 
-        return response;
+    private static <T> T bean(Class<T> type) {
+        ApplicationContext ctx = springContext;
+        if (ctx == null) {
+            synchronized (GetUserPreferencesHandler.class) {
+                if (springContext == null) {
+                    springContext = SpringApplication.run(VolunteerApplication.class);
+                }
+                ctx = springContext;
+            }
+        }
+        return ctx.getBean(type);
+    }
+
+    private APIGatewayProxyResponseEvent error(APIGatewayProxyResponseEvent response, int status,
+                                               SaayamStatusCode code, String message) {
+        SaayamResponse<Void> errorResponse = responseBuilder.buildErrorResponse(status, code, message);
+        try {
+            return response.withStatusCode(status).withBody(OBJECT_MAPPER.writeValueAsString(errorResponse));
+        } catch (JsonProcessingException jsonException) {
+            return response.withStatusCode(status).withBody("{\"message\":\"Failed to serialize error response\"}");
+        }
     }
 }

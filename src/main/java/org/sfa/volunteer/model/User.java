@@ -76,13 +76,13 @@ public class User {
     private String lastLocation;
 
     @Column(name = "language_1")
-    private String language1;
+    private Long language1;
 
     @Column(name = "language_2")
-    private String language2;
+    private Long language2;
 
     @Column(name = "language_3")
-    private String language3;
+    private Long language3;
 
     @Column(name = "promotion_wizard_stage")
     private Integer volunteerStage;

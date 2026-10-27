@@ -43,6 +43,26 @@ public interface UserRepository extends JpaRepository<User, String> {
     int updateProfilePicturePath(@Param("userId") String userId, @Param("s3Uri") String s3Uri,
             @Param("now") ZonedDateTime now);
 
+    // Narrow update for the preferences path: avoid saving the full User
+    // entity, which currently includes last_location (a Postgres `point`
+    // column mapped as String on User) -- a full-entity save fails on that
+    // mismatch the same way language_1/2/3 used to. See issue #165 follow-up
+    // on the broader schema drift.
+    @Modifying
+    @Query("""
+            update User u set
+                u.language1 = :language1,
+                u.language2 = :language2,
+                u.language3 = :language3,
+                u.lastUpdateDate = :now
+            where u.id = :userId
+            """)
+    int updateLanguages(@Param("userId") String userId,
+            @Param("language1") Long language1,
+            @Param("language2") Long language2,
+            @Param("language3") Long language3,
+            @Param("now") ZonedDateTime now);
+
     @Query("""
             select u from User u
             where

@@ -6,10 +6,12 @@ import org.sfa.volunteer.dto.request.UpdateUserProfileRequest;
 import org.sfa.volunteer.dto.request.UserPreferenceRequest;
 import org.sfa.volunteer.dto.response.*;
 import org.sfa.volunteer.exception.CountryNotFoundException;
+import org.sfa.volunteer.exception.LanguageNotFoundException;
 import org.sfa.volunteer.exception.UserCategoryNotFoundException;
 import org.sfa.volunteer.exception.UserNotFoundException;
 import org.sfa.volunteer.model.Country;
 import org.sfa.volunteer.model.State;
+import org.sfa.volunteer.model.SupportingLanguage;
 import org.sfa.volunteer.model.User;
 import org.sfa.volunteer.model.UserAdditionalDetail;
 import org.sfa.volunteer.model.UserSignOffReason;
@@ -17,6 +19,7 @@ import org.sfa.volunteer.model.SkillLevel;
 import org.sfa.volunteer.model.UserStatus;
 import org.sfa.volunteer.repository.CountryRepository;
 import org.sfa.volunteer.repository.StateRepository;
+import org.sfa.volunteer.repository.SupportingLanguageRepository;
 import org.sfa.volunteer.repository.UserCategoryRepository;
 import org.sfa.volunteer.repository.UserRepository;
 import org.sfa.volunteer.repository.UserSignOffReasonRepository;
@@ -53,6 +56,7 @@ import java.util.stream.Collectors;
     private final StateRepository stateRepository;
     private final UserAdditionalDetailRepository userAdditionalDetailRepository;
     private final UserSkillRepository userSkillRepository;
+    private final SupportingLanguageRepository supportingLanguageRepository;
 
     private static final int DEFAULT_PAGE = 0;
     private static final int DEFAULT_SIZE = 10;
@@ -73,7 +77,8 @@ import java.util.stream.Collectors;
             StateRepository stateRepository,
             UserSignOffReasonRepository userSignOffReasonRepository,
             UserAdditionalDetailRepository userAdditionalDetailRepository,
-            UserSkillRepository userSkillRepository) {
+            UserSkillRepository userSkillRepository,
+            SupportingLanguageRepository supportingLanguageRepository) {
 
         this.userRepository = userRepository;
         this.userStatusRepository = userStatusRepository;
@@ -83,6 +88,7 @@ import java.util.stream.Collectors;
         this.userSignOffReasonRepository = userSignOffReasonRepository;
         this.userAdditionalDetailRepository = userAdditionalDetailRepository;
         this.userSkillRepository = userSkillRepository;
+        this.supportingLanguageRepository = supportingLanguageRepository;
     }
 
     @Override
@@ -286,9 +292,12 @@ import java.util.stream.Collectors;
                 .userCategory(null)
                 .gender(user.getGender())
                 .lastLocation(user.getLastLocation())
-                .language1(user.getLanguage1())
-                .language2(user.getLanguage2())
-                .language3(user.getLanguage3())
+                .language1Id(user.getLanguage1())
+                .language1(resolveLanguageName(user.getLanguage1()))
+                .language2Id(user.getLanguage2())
+                .language2(resolveLanguageName(user.getLanguage2()))
+                .language3Id(user.getLanguage3())
+                .language3(resolveLanguageName(user.getLanguage3()))
                 .promotionWizardStage(user.getVolunteerStage())
                 .promotionWizardLastUpdateDate(user.getVolunteerUpdateDate())
                 .build();
@@ -394,11 +403,16 @@ import java.util.stream.Collectors;
 
         return UserPreferenceResponse.builder()
                 .userId(user.getId())
-                .userCategoryId(user.getUserCategory() != null ? user.getUserCategory().getUserCategoryId() : null)
-                .userCategory(user.getUserCategory() != null ? user.getUserCategory().getUserCategory() : null)
-                .language1(user.getLanguage1())
-                .language2(user.getLanguage2())
-                .language3(user.getLanguage3())
+                // userCategory no longer mapped on User; see issue #165 follow-up
+                .userCategoryId(null)
+                .userCategory(null)
+                .timeZone(user.getTimeZone())
+                .language1Id(user.getLanguage1())
+                .language1(resolveLanguageName(user.getLanguage1()))
+                .language2Id(user.getLanguage2())
+                .language2(resolveLanguageName(user.getLanguage2()))
+                .language3Id(user.getLanguage3())
+                .language3(resolveLanguageName(user.getLanguage3()))
                 .primaryEmail(detail != null ? detail.getSecondaryEmail1() : null)
                 .secondaryEmail(detail != null ? detail.getSecondaryEmail2() : null)
                 .primaryPhone(detail != null ? detail.getSecondaryPhone1() : null)
@@ -412,18 +426,17 @@ import java.util.stream.Collectors;
          User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException(userId));
 
-            // update user category if provided
-            if (request.userCategoryId() != null) {
-                UserCategory userCategory = userCategoryRepository.findById(request.userCategoryId())
-                        .orElseThrow(() -> new UserCategoryNotFoundException(request.userCategoryId()));
-                user.setUserCategory(userCategory);
-            }
+            // userCategory no longer mapped on User; see issue #165 follow-up
 
-            // update language prefs
-            user.setLanguage1(request.language1());
-            user.setLanguage2(request.language2());
-            user.setLanguage3(request.language3());
-            userRepository.save(user);
+            // update language prefs (language_1/2/3 are FKs into supporting_languages).
+            // Narrow update, not a full-entity save: User.lastLocation maps a
+            // Postgres `point` column as String, which fails the same way
+            // language_1/2/3 used to on a full save. See issue #165 follow-up.
+            validateLanguageId(request.language1());
+            validateLanguageId(request.language2());
+            validateLanguageId(request.language3());
+            userRepository.updateLanguages(userId, request.language1(), request.language2(), request.language3(),
+                    ZonedDateTime.now(ZoneId.of("UTC")));
 
             // fetch UserAdditionalDetail
             UserAdditionalDetail detail = userAdditionalDetailRepository.findByUserId(user.getId());
@@ -439,15 +452,35 @@ import java.util.stream.Collectors;
 
             return UserPreferenceResponse.builder()
                     .userId(user.getId())
-                    .userCategoryId(user.getUserCategory() != null ? user.getUserCategory().getUserCategoryId() : null)
-                    .userCategory(user.getUserCategory() != null ? user.getUserCategory().getUserCategory() : null)
-                    .language1(user.getLanguage1())
-                    .language2(user.getLanguage2())
-                    .language3(user.getLanguage3())
+                    // userCategory no longer mapped on User; see issue #165 follow-up
+                    .userCategoryId(null)
+                    .userCategory(null)
+                    .timeZone(user.getTimeZone())
+                    .language1Id(request.language1())
+                    .language1(resolveLanguageName(request.language1()))
+                    .language2Id(request.language2())
+                    .language2(resolveLanguageName(request.language2()))
+                    .language3Id(request.language3())
+                    .language3(resolveLanguageName(request.language3()))
                     .primaryEmail(detail.getSecondaryEmail1())
                     .secondaryEmail(detail.getSecondaryEmail2())
                     .primaryPhone(detail.getSecondaryPhone1())
                     .secondaryPhone(detail.getSecondaryPhone2())
                     .build();
+    }
+
+    private String resolveLanguageName(Long languageId) {
+        if (languageId == null) {
+            return null;
+        }
+        return supportingLanguageRepository.findById(languageId)
+                .map(SupportingLanguage::getLanguageName)
+                .orElse(null);
+    }
+
+    private void validateLanguageId(Long languageId) {
+        if (languageId != null && !supportingLanguageRepository.existsById(languageId)) {
+            throw new LanguageNotFoundException(languageId);
+        }
     }
 }

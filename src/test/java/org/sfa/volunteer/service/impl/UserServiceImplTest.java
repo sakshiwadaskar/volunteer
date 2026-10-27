@@ -15,12 +15,11 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.sfa.volunteer.dto.request.UserPreferenceRequest;
 import org.sfa.volunteer.dto.response.UserPreferenceResponse;
-import org.sfa.volunteer.exception.UserCategoryNotFoundException;
 import org.sfa.volunteer.exception.UserNotFoundException;
+import org.sfa.volunteer.model.SupportingLanguage;
 import org.sfa.volunteer.model.UserAdditionalDetail;
-import org.sfa.volunteer.model.UserCategory;
+import org.sfa.volunteer.repository.SupportingLanguageRepository;
 import org.sfa.volunteer.repository.UserAdditionalDetailRepository;
-import org.sfa.volunteer.repository.UserCategoryRepository;
 import org.sfa.volunteer.repository.UserRepository;
 import java.util.Optional;
 
@@ -30,10 +29,10 @@ class UserServiceImplTest {
     private UserRepository userRepository;
 
     @Mock
-    private UserCategoryRepository userCategoryRepository;
+    private UserAdditionalDetailRepository userAdditionalDetailRepository;
 
     @Mock
-    private UserAdditionalDetailRepository userAdditionalDetailRepository;
+    private SupportingLanguageRepository supportingLanguageRepository;
 
     @InjectMocks
     private UserServiceImpl userService;
@@ -47,18 +46,16 @@ class UserServiceImplTest {
     void testGetUserPreferences_Success() throws Exception {
         // Arrange
         String userId = "testUserId";
-        UserCategory userCategory = UserCategory.builder()
-                .userCategoryId(1)
-                .userCategory("Volunteer")
-                .build();
         User user = User.builder()
                 .id(userId)
-                .language1("English")
-                .userCategory(userCategory)
+                .timeZone("America/New_York")
+                .language1(1L)
                 .build();
 
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         when(userAdditionalDetailRepository.findByUserId(userId)).thenReturn(null);
+        when(supportingLanguageRepository.findById(1L))
+                .thenReturn(Optional.of(SupportingLanguage.builder().languageId(1L).languageName("English").build()));
 
         // Act
         UserPreferenceResponse response = userService.getUserPreferences(userId);
@@ -66,8 +63,10 @@ class UserServiceImplTest {
         // Assert
         assertNotNull(response);
         assertEquals(userId, response.userId());
+        assertEquals("America/New_York", response.timeZone());
+        assertEquals(1L, response.language1Id());
         assertEquals("English", response.language1());
-        assertEquals("Volunteer", response.userCategory());
+        assertNull(response.userCategory());
         verify(userRepository).findById(userId);
     }
     @Test
@@ -75,16 +74,10 @@ class UserServiceImplTest {
         // Arrange
         String userId = "testUserId";
 
-        UserCategory userCategory = UserCategory.builder()
-                .userCategoryId(2)
-                .userCategory("Volunteer")
-                .build();
-
         User user = User.builder()
                 .id(userId)
-                .language1("English")
-                .language2("Spanish")
-                .userCategory(userCategory)
+                .language1(1L)
+                .language2(2L)
                 .build();
 
         UserAdditionalDetail additionalDetail = UserAdditionalDetail.builder()
@@ -97,6 +90,10 @@ class UserServiceImplTest {
         // Mock the repository behaviors
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         when(userAdditionalDetailRepository.findByUserId(userId)).thenReturn(additionalDetail);
+        when(supportingLanguageRepository.findById(1L))
+                .thenReturn(Optional.of(SupportingLanguage.builder().languageId(1L).languageName("English").build()));
+        when(supportingLanguageRepository.findById(2L))
+                .thenReturn(Optional.of(SupportingLanguage.builder().languageId(2L).languageName("Spanish").build()));
 
         // Act
         UserPreferenceResponse response = userService.getUserPreferences(userId);
@@ -106,7 +103,7 @@ class UserServiceImplTest {
         assertEquals(userId, response.userId());
         assertEquals("English", response.language1());
         assertEquals("Spanish", response.language2());
-        assertEquals("Volunteer", response.userCategory());
+        assertNull(response.userCategory());
         assertEquals("secondary@example.com", response.primaryEmail());
         assertEquals("123-456-7890", response.primaryPhone());
 
@@ -121,13 +118,14 @@ class UserServiceImplTest {
         String userId = "testUserId";
         User user = User.builder()
                 .id(userId)
-                .language1("English")
-                .userCategory(null) // No category assigned yet
+                .language1(1L)
                 .build();
 
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         // Return null simulating that the user hasn't filled out extra preferences yet
         when(userAdditionalDetailRepository.findByUserId(userId)).thenReturn(null);
+        when(supportingLanguageRepository.findById(1L))
+                .thenReturn(Optional.of(SupportingLanguage.builder().languageId(1L).languageName("English").build()));
 
         // Act
         UserPreferenceResponse response = userService.getUserPreferences(userId);

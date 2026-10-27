@@ -3,17 +3,18 @@ package org.sfa.volunteer.repository;
 import org.junit.jupiter.api.Test;
 import org.sfa.volunteer.model.User;
 import org.sfa.volunteer.model.UserAdditionalDetail;
-import org.sfa.volunteer.model.UserCategory;
 import org.sfa.volunteer.model.UserStatus;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
+import org.springframework.test.context.ActiveProfiles;
 
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 @DataJpaTest
+@ActiveProfiles("test")
 class UserPreferencesRepositoryTest {
 
     @Autowired
@@ -33,18 +34,12 @@ class UserPreferencesRepositoryTest {
                 .userStatus("Active")
                 .build());
 
-        UserCategory category = entityManager.persist(UserCategory.builder()
-                .userCategoryId(1)
-                .userCategory("Common User")
-                .build());
-
         User user = entityManager.persist(User.builder()
-                .language1("English")
-                .language2("Spanish")
+                .language1(1L)
+                .language2(2L)
                 .timeZone("America/New_York")
                 .fullName("Sakshi Wadaskar")
                 .userStatus(status)
-                .userCategory(category)
                 .build());
 
         entityManager.flush();
@@ -54,8 +49,8 @@ class UserPreferencesRepositoryTest {
 
         // Assert
         assertTrue(found.isPresent());
-        assertEquals("English", found.get().getLanguage1());
-        assertEquals("Spanish", found.get().getLanguage2());
+        assertEquals(1L, found.get().getLanguage1());
+        assertEquals(2L, found.get().getLanguage2());
         assertEquals("Sakshi Wadaskar", found.get().getFullName());
     }
 
@@ -77,17 +72,11 @@ class UserPreferencesRepositoryTest {
                 .userStatus("Active")
                 .build());
 
-        UserCategory category = entityManager.persist(UserCategory.builder()
-                .userCategoryId(2)
-                .userCategory("Volunteer")
-                .build());
-
         User user = entityManager.persist(User.builder()
-                .language1("English")
+                .language1(1L)
                 .timeZone("UTC")
                 .fullName("Test User")
                 .userStatus(status)
-                .userCategory(category)
                 .build());
 
         UserAdditionalDetail detail = entityManager.persist(UserAdditionalDetail.builder()
